@@ -1,0 +1,5 @@
+fastapi==0.115.12
+httpx[socks]==0.28.1
+pydantic-settings==2.9.1
+uvicorn[standard]==0.34.2
+
