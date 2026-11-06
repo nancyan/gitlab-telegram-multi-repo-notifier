@@ -128,6 +128,10 @@ To send shared notifications to a different chat:
 /addrepo group/project -1001234567890
 ```
 
+If Telegram Topics are enabled, send `/addrepo group/project` inside the
+desired topic. The bot stores its `message_thread_id` automatically and sends
+that project's shared notifications only to that topic.
+
 The bot returns:
 
 1. A unique webhook URL.
@@ -173,6 +177,8 @@ Administrator commands:
 | `/disablerepo KEY` | Temporarily disable a project webhook |
 | `/enablerepo KEY` | Enable it again |
 | `/linkcode @username [USER_ID]` | Create a private-account linking code |
+| `/settopic KEY` | Route an existing project to the topic containing this command |
+| `/cleartopic KEY` | Route an existing project back to the chat's General section |
 
 User commands:
 

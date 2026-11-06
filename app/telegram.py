@@ -41,7 +41,12 @@ class TelegramClient:
         return body
 
     async def send_message(
-        self, chat_id: int, text: str, *, reply_markup: dict | None = None
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        reply_markup: dict | None = None,
+        message_thread_id: int | None = None,
     ) -> None:
         payload: dict = {
             "chat_id": chat_id,
@@ -51,6 +56,8 @@ class TelegramClient:
         }
         if reply_markup:
             payload["reply_markup"] = reply_markup
+        if message_thread_id is not None:
+            payload["message_thread_id"] = message_thread_id
         await self._call("sendMessage", payload)
 
     async def get_updates(

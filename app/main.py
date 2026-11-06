@@ -66,6 +66,8 @@ async def _admin_command(command: str, arguments: list[str], message: dict) -> b
         "/disablerepo",
         "/enablerepo",
         "/linkcode",
+        "/settopic",
+        "/cleartopic",
     }:
         return False
     if int(sender["id"]) not in settings.admin_ids:
@@ -83,12 +85,15 @@ async def _admin_command(command: str, arguments: list[str], message: dict) -> b
             return True
         project_path = arguments[0].strip("/")
         shared_chat_id: int | None = chat_id
+        shared_thread_id: int | None = message.get("message_thread_id")
         if len(arguments) > 1:
             if arguments[1].casefold() == "personal":
                 shared_chat_id = None
+                shared_thread_id = None
             else:
                 try:
                     shared_chat_id = int(arguments[1])
+                    shared_thread_id = None
                 except ValueError:
                     await telegram.send_message(chat_id, "CHAT_ID должен быть числом.")
                     return True
@@ -101,6 +106,7 @@ async def _admin_command(command: str, arguments: list[str], message: dict) -> b
                 project_path,
                 hash_secret(webhook_secret),
                 shared_chat_id,
+                shared_thread_id,
             )
         except Exception:
             logger.exception("Could not add GitLab repository path=%s", project_path)
@@ -114,6 +120,7 @@ async def _admin_command(command: str, arguments: list[str], message: dict) -> b
             f"Secret token:\n<code>{webhook_secret}</code>\n\n"
             "Секрет показывается только сейчас. В GitLab включите нужные события "
             "и оставьте проверку SSL включённой.",
+            message_thread_id=shared_thread_id,
         )
         return True
 
@@ -166,6 +173,37 @@ async def _admin_command(command: str, arguments: list[str], message: dict) -> b
             )
         else:
             await telegram.send_message(chat_id, "Репозиторий не найден.")
+        return True
+
+    if command in {"/settopic", "/cleartopic"}:
+        if not arguments:
+            await telegram.send_message(chat_id, f"Использование: {command} KEY")
+            return True
+        current_thread_id = message.get("message_thread_id")
+        if command == "/settopic" and current_thread_id is None:
+            await telegram.send_message(
+                chat_id,
+                "Отправьте эту команду внутри нужного топика Telegram.",
+            )
+            return True
+        target_thread_id = int(current_thread_id) if command == "/settopic" else None
+        if database.set_repository_topic(arguments[0], chat_id, target_thread_id):
+            answer = (
+                "✅ Уведомления проекта направлены в этот топик."
+                if command == "/settopic"
+                else "✅ Уведомления проекта направлены в общий раздел чата."
+            )
+            await telegram.send_message(
+                chat_id,
+                answer,
+                message_thread_id=current_thread_id,
+            )
+        else:
+            await telegram.send_message(
+                chat_id,
+                "Репозиторий не найден.",
+                message_thread_id=current_thread_id,
+            )
         return True
 
     if command == "/linkcode":

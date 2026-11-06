@@ -296,6 +296,7 @@ class GitLabNotifier:
         chat_id: int,
         target_key: str,
         heading: str,
+        message_thread_id: int | None = None,
     ) -> bool:
         if not self.database.claim_delivery(event.event_id, target_key):
             logger.info(
@@ -306,7 +307,12 @@ class GitLabNotifier:
             return False
         message, markup = format_message(event, heading)
         try:
-            await self.telegram.send_message(chat_id, message, reply_markup=markup)
+            await self.telegram.send_message(
+                chat_id,
+                message,
+                reply_markup=markup,
+                message_thread_id=message_thread_id,
+            )
         except TelegramError:
             self.database.release_delivery(event.event_id, target_key)
             logger.exception(
@@ -354,6 +360,7 @@ class GitLabNotifier:
                 int(repository["shared_chat_id"]),
                 f"shared:{repository['id']}:{repository['shared_chat_id']}",
                 heading,
+                repository["shared_thread_id"],
             ):
                 sent += 1
 
@@ -390,10 +397,11 @@ def repository_summary(repository: sqlite3.Row) -> str:
     events = ",".join(sorted(json.loads(repository["enabled_events"])))
     state = "active" if repository["active"] else "disabled"
     chat = repository["shared_chat_id"] or "personal-only"
+    thread = repository["shared_thread_id"] or "general"
     return (
         f"<b>{escape(repository['display_name'])}</b>\n"
         f"Path: <code>{escape(repository['project_path'])}</code>\n"
         f"Key: <code>{escape(repository['repository_key'])}</code>\n"
-        f"Chat: <code>{chat}</code> · {state}\n"
+        f"Chat: <code>{chat}</code> · topic: <code>{thread}</code> · {state}\n"
         f"Events: <code>{escape(events)}</code>"
     )

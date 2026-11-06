@@ -7,12 +7,17 @@ from app.service import GitLabNotifier, Person, parse_gitlab_event
 
 class FakeTelegram:
     def __init__(self) -> None:
-        self.messages: list[tuple[int, str, dict | None]] = []
+        self.messages: list[tuple[int, str, dict | None, int | None]] = []
 
     async def send_message(
-        self, chat_id: int, text: str, *, reply_markup: dict | None = None
+        self,
+        chat_id: int,
+        text: str,
+        *,
+        reply_markup: dict | None = None,
+        message_thread_id: int | None = None,
     ) -> None:
-        self.messages.append((chat_id, text, reply_markup))
+        self.messages.append((chat_id, text, reply_markup, message_thread_id))
 
 
 def issue_payload() -> dict:
@@ -132,3 +137,20 @@ def test_self_mention_does_not_send_personal_notification(tmp_path) -> None:
     )
 
     assert [message[0] for message in telegram.messages] == [-100100]
+
+
+def test_shared_notification_is_sent_to_configured_topic(tmp_path) -> None:
+    database, repository = linked_database(tmp_path)
+    database.set_repository_topic("example-key", -100100, 77)
+    repository = database.get_repository("example-key")
+    telegram = FakeTelegram()
+    notifier = GitLabNotifier(database, telegram)
+
+    asyncio.run(
+        notifier.process(repository, issue_payload(), "Issue Hook", "topic-event")
+    )
+
+    assert telegram.messages[0][0] == -100100
+    assert telegram.messages[0][3] == 77
+    assert telegram.messages[1][0] == 1001
+    assert telegram.messages[1][3] is None

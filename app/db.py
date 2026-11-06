@@ -45,6 +45,7 @@ class Database:
                     display_name TEXT NOT NULL,
                     secret_hash TEXT NOT NULL,
                     shared_chat_id INTEGER,
+                    shared_thread_id INTEGER,
                     enabled_events TEXT NOT NULL,
                     active INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL
@@ -78,6 +79,14 @@ class Database:
                 );
                 """
             )
+            repository_columns = {
+                row["name"]
+                for row in connection.execute("PRAGMA table_info(repositories)")
+            }
+            if "shared_thread_id" not in repository_columns:
+                connection.execute(
+                    "ALTER TABLE repositories ADD COLUMN shared_thread_id INTEGER"
+                )
 
     @staticmethod
     def normalize_username(value: str) -> str:
@@ -94,6 +103,7 @@ class Database:
         display_name: str,
         secret_hash: str,
         shared_chat_id: int | None,
+        shared_thread_id: int | None = None,
         enabled_events: set[str] | None = None,
     ) -> sqlite3.Row:
         now = datetime.now(UTC).isoformat()
@@ -104,8 +114,9 @@ class Database:
                 """
                 INSERT INTO repositories (
                     repository_key, project_path, display_name, secret_hash,
-                    shared_chat_id, enabled_events, active, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                    shared_chat_id, shared_thread_id, enabled_events, active,
+                    created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
                 """,
                 (
                     repository_key,
@@ -113,6 +124,7 @@ class Database:
                     display_name,
                     secret_hash,
                     shared_chat_id,
+                    shared_thread_id,
                     json.dumps(events),
                     now,
                 ),
@@ -140,6 +152,23 @@ class Database:
             cursor = connection.execute(
                 "UPDATE repositories SET active = ? WHERE repository_key = ?",
                 (int(active), repository_key),
+            )
+            return cursor.rowcount > 0
+
+    def set_repository_topic(
+        self,
+        repository_key: str,
+        shared_chat_id: int,
+        shared_thread_id: int | None,
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE repositories
+                SET shared_chat_id = ?, shared_thread_id = ?
+                WHERE repository_key = ?
+                """,
+                (shared_chat_id, shared_thread_id, repository_key),
             )
             return cursor.rowcount > 0
 
