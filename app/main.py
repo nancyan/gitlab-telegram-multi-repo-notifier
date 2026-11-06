@@ -367,11 +367,11 @@ async def gitlab_webhook(
     return {"ok": True, "status": "accepted", "event_id": event_id}
 
 
-@app.post("/webhooks/telegram", status_code=204)
+@app.post("/webhooks/telegram")
 async def telegram_webhook(
     request: Request,
     x_telegram_bot_api_secret_token: str | None = Header(default=None),
-) -> None:
+) -> dict:
     if settings.telegram_update_mode != "webhook":
         raise HTTPException(status_code=404)
     if not secrets.compare_digest(
@@ -381,3 +381,4 @@ async def telegram_webhook(
     update = await request.json()
     if update.get("message"):
         await _handle_message(update["message"])
+    return {"ok": True}
